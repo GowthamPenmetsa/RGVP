@@ -1,0 +1,19 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: "pc-sample-app"
+  namespace: pc-sample-dev
+  annotations:
+    kubernetes.io/ingress.class: "nginx-internal"
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+  labels:
+    app: pc-sample-app
+spec:
+  rules:
+    - host: petclinic-sample-dev.dev.dcp.cipcloudservice.com
+      http:
+        paths:
+          - path: /
+            backend:
+              serviceName: "pc-sample-app-svc"
+              servicePort: 80

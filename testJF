@@ -1,0 +1,46 @@
+def repoName
+def repoURL
+def branchName
+pipeline {
+  agent any
+  tools {
+  nodejs "NODE"
+  maven "maven3.6.3"
+  }
+ 
+  stages{
+     
+    stage('SCM Checkout'){
+	steps {
+        script {
+      def scmVars = checkout([
+        $class: 'GitSCM'
+      ])
+      echo "env.GIT_COMMIT"
+      echo "${env.GIT_COMMIT}"
+    }
+       checkout([$class: 'GitSCM', branches: [[name: '*/master']], doGenerateSubmoduleConfigurations: false, extensions: [], submoduleCfg: [], userRemoteConfigs: [[credentialsId: 'GithubCredentails', url: 'https://github.com/mudaliar20/CanApplication.git']]])
+        
+                
+    }
+	}
+    
+    
+        
+
+    
+    stage('Build Docker Image'){
+	steps{
+        sh 'docker build -t petclinic:${BUILD_NUMBER} . '
+    }
+	}
+        
+  
+    
+}
+  
+   
+}
+
+
+

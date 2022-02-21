@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-internal: 10.0.0.0/8
+  labels:
+    app: pc-sample-app
+  name: pc-sample-app-svc
+  namespace: pc-sample-dev
+spec:
+  externalTrafficPolicy: Cluster
+  ports:
+    - name: http
+      port: 80
+      protocol: TCP
+      targetPort: 8080
+  selector:
+    app: pc-sample-app
+  sessionAffinity: None
+  type: NodePort

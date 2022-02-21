@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    name: springboot
+  name: powertrain
+  namespace: powertrain-prod
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: springboot
+  template:
+    metadata:
+      labels:
+        name: springboot
+    spec:
+      containers:
+      - image: gcr.io/ford-project-319713/powertrain:@IMG_TAG@
+        imagePullSecrets:
+        - name: nexus
+        name: springboot
+        ports:
+        - name: springboot
+          containerPort: 8080
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    name: springboot
+  name: powertrain-svc
+  namespace: powertrain-prod
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 8080
+      targetPort: 8080
+  selector:
+    name: springboot

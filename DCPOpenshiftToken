@@ -1,0 +1,40 @@
+@Library(['Jenkins_Libraries']) _
+
+pipeline {
+    agent any
+    
+    stages {
+        stage('Deploying application into OpenShift'){
+        when {
+            expression { ! params.destroy }
+        }
+        steps{
+            script {
+            def buildNumber = Jenkins.instance.getItem('Powertrain').lastSuccessfulBuild.number
+            print buildNumber
+            generateOCPToken("$env.username","$env.password")
+
+            /*sh '''#!/bin/bash -l
+            oc login --token=sha256~FAqw9vdIMM_zD7_Z9WrSODeNK2CdDfPegti-1Ggc714 --server=https://api.openshift.68kv.p2.openshiftapps.com:6443
+            oc project powertrain
+            OUT=$(oc get deployment|grep powertrain|awk '{print $1}')
+            echo $OUT
+
+            if [ "$OUT" == "powertrain" ]
+            then
+                    
+                    sed -i "s/@IMG_TAG@/'''+ buildNumber +'''/g" "${WORKSPACE}/os-deployment.yaml"
+                    oc apply -f os-deployment.yaml
+            else
+                    
+                    sed -i "s/@IMG_TAG@/'''+ buildNumber +'''/g" "${WORKSPACE}/os-deployment.yaml"
+                    oc create -f os-deployment.yaml
+            fi  
+        
+            '''*/
+            
+        }
+        }
+        }
+    }
+}

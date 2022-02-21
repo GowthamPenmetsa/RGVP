@@ -1,0 +1,45 @@
+def repoName
+def repoURL
+def branchName
+pipeline {
+  agent any
+  tools {
+  nodejs "NODE"
+  maven "maven3.6.3"
+  }
+  environment {
+        buildnumber = "${BUILD_NUMBER}"
+        jobName    = "${env.JOB_NAME}"
+        
+        
+    }
+  stages{
+     
+    stage('SCM Checkout'){
+	steps {
+        script {
+      def scmVars = checkout([
+        $class: 'GitSCM'
+      ])
+      echo "env.GIT_COMMIT"
+      echo "${env.GIT_COMMIT}"
+    }
+       checkout([$class: 'GitSCM', branches: [[name: '*/master']], doGenerateSubmoduleConfigurations: false, extensions: [], submoduleCfg: [], userRemoteConfigs: [[credentialsId: 'GithubCredentails', url: 'https://github.com/mudaliar20/CanApplication.git']]])
+        curlCmd = "curl -X GET --header 'apikey: 04d628650b05b23d6d099b5ce1a2d1b7c940469d' 'https://sonarqube.kaiburr.com:9000/api/measures/component?metricKeys=ncloc,complexity,violations,bugs,coverage,lines,statements,functions,classes,files,code_smells,cognitive_complexity,comment_lines,duplicated_lines,sqale_rating&componentKey=petclinic'"
+        def response = sh(script: "${curlCmd}", returnStdout: true)
+      echo '=========================Response===================' + response           
+    }
+	}
+    
+
+
+
+     
+    
+}
+  
+
+
+}
+
+

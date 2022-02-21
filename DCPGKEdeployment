@@ -1,0 +1,37 @@
+//noinspection GroovyAssignabilityCheck
+
+pipeline {
+    agent any
+    
+    stages {
+        stage('Deploying application into GKE'){
+        when {
+            expression { ! params.destroy }
+        }
+        steps{
+            script {
+            def buildNumber = Jenkins.instance.getItem('Powertrain').lastSuccessfulBuild.number
+            print buildNumber
+            sh '''#!/bin/bash -l
+            gcloud auth list
+            gcloud container clusters get-credentials dcp-gke --region us-east1 --project ford-project-319713
+            OUT=$(kubectl get pods -n powertrain-gke-dev | grep powertrain | awk '{print $1}')
+            echo $OUT
+
+            if [ "$OUT" == "powertrain" ]
+            then
+                    
+                    sed -i "s/@IMG_TAG@/'''+ buildNumber +'''/g" "${WORKSPACE}/gke-deployment.yaml"
+                    kubectl replace -f gke-deployment.yaml
+            else
+                    
+                    sed -i "s/@IMG_TAG@/'''+ buildNumber +'''/g" "${WORKSPACE}/gke-deployment.yaml"
+                    kubectl apply -f gke-deployment.yaml
+            fi  
+        
+            '''
+        }
+        }
+        }
+    }
+}

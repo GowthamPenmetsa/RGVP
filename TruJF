@@ -1,0 +1,132 @@
+def repoName
+def repoURL
+def branchName
+pipeline {
+  agent any
+  tools {
+  nodejs "NODE"
+  maven "maven3.6.3"
+  }
+  environment {
+        buildnumber = "${BUILD_NUMBER}"
+        jobName    = "${env.JOB_NAME}"
+        
+        
+    }
+  stages{
+     
+    stage('SCM Checkout'){
+	steps {
+        script {
+      def scmVars = checkout([
+        $class: 'GitSCM'
+      ])
+      echo "env.GIT_COMMIT"
+      echo "${env.GIT_COMMIT}"
+    }
+       checkout([$class: 'GitSCM', branches: [[name: '*/master']], doGenerateSubmoduleConfigurations: false, extensions: [], submoduleCfg: [], userRemoteConfigs: [[credentialsId: 'GithubCredentails', url: 'https://github.com/mudaliar20/CanApplication.git']]])
+        
+                
+    }
+	}
+    
+    stage(" Maven Clean Package"){
+	steps{
+     // def mavenHome =  tool name: "maven3.6.3", type: "maven"
+     // def mavenCMD = "${mavenHome}/bin/mvn"
+      sh "mvn clean package -DskipTests"
+      sh 'npm install'
+      
+    } 
+	}
+        
+     stage('Black duck Scan'){
+	steps {
+       synopsys_detect detectProperties: '''
+       --detect.project.version.name=${BUILD_NUMBER}
+       --detect.project.name="Canada-Application"
+       --detect.source.path=${WORKSPACE}
+       --detect.report.timeout=30000
+       ''', returnStatus: true
+    }
+	} 
+
+    
+    stage('Build Docker Image'){
+	steps{
+        sh 'docker build -t 3.128.135.88:8083/petclinic:${BUILD_NUMBER} . >&1 | tee SomeFile.txt '
+    }
+	}
+        
+       stage('twislock scan'){
+	    steps{
+	    sh '''
+	    /home/ubuntu/twistcli images scan --address https://us-west1.cloud.twistlock.com/us-3-159244848 -u 497d19ff-6c5c-431a-bf94-3e17f628938f -p 0pl+T/QwHVpMNy/CJVzkKR+cHSs= 3.128.135.88:8083/petclinic:${BUILD_NUMBER} >&1 | tee demo.txt
+	    '''
+	}
+	} 
+    
+    stage('Push Docker Image'){
+	steps{
+	    sh '''
+        docker login -u admin -p admin123 3.128.135.88:8083
+        '''
+         sh 'docker push 3.128.135.88:8083/petclinic:${BUILD_NUMBER} >&1 | tee docker.txt'
+     }
+	 }
+     
+  
+	
+     stage('Test') {
+	 steps{
+	 script{
+	 repoName = determineRepoName()
+         branchName = getGitBranchName() 
+         repoURL = determineRepoURL()
+	 }
+         sh ' rm -rf *.properties'
+         sh '''
+        IMAGEID="$(grep "sha256:" demo.txt | cut -c 59-129 | awk '{$1=$1;print}')"
+         echo "TwislockImageID=${IMAGEID}" >> variable.properties
+         IMAGENAME="$(grep "Successfully tagged" SomeFile.txt | cut -d' ' -f 3)"
+         echo "TwislockImageName=${IMAGENAME}" >> variable.properties
+         '''
+        	     
+         sh "echo jobName=${env.JOB_NAME} >> variable.properties"
+sh "echo buildNumber=${env.BUILD_NUMBER} >> variable.properties"
+sh "echo repoName=$repoName >> variable.properties"
+sh "echo branchName=$branchName >> variable.properties"
+sh "echo repoURL=$repoURL >> variable.properties"
+sh "echo commitId=${env.GIT_COMMIT} >> variable.properties"
+sh "echo BlackDuckProject=Canada-Application >> variable.properties"
+sh "echo BlackDuckVersion=${env.BUILD_NUMBER} >> variable.properties"
+
+
+
+    }
+     }
+     
+    
+}
+  
+    post {
+        always {
+            
+            archiveArtifacts artifacts: "variable.properties"
+        }
+    } 
+
+}
+
+
+
+String determineRepoName() {
+    return scm.getUserRemoteConfigs()[0].getUrl().tokenize('/')[3].split("\\.")[0]
+}
+String determineRepoURL() {
+    return scm.getUserRemoteConfigs()[0].getUrl()
+}
+String getGitBranchName() {
+    return scm.branches[0].name.tokenize("*")[0].split("\\/")[1]
+}
+

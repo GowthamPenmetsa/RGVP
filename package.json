@@ -1,0 +1,24 @@
+{
+  "name": "nodejs-hello-world",
+  "version": "1.0.0",
+  "description": "Hello World sample app",
+  "main": "index.js",
+  "publishConfig": {
+    "registry": "http://3.128.135.88:8008/repository/lambdarepo/"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "pack": "npm-pack-zip"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fhinkel/nodejs-hello-world.git"
+  },
+  "devDependencies": {
+    "npm-pack-zip": "^1.2.7"
+  },
+
+  "files": [ "Cloud-build.yaml" , "CanadaApp*.properties"]
+
+}

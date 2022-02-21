@@ -1,0 +1,7 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    name: springboot
+  name: powertrain
+  namespace: powertrain-prod

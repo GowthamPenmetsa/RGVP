@@ -1,0 +1,106 @@
+pipeline {
+  agent any
+  tools {
+  nodejs "NODE"
+  maven "maven3.6.3"
+  }
+  environment {
+        buildnumber = "${BUILD_NUMBER}"
+        jobName    = "${env.JOB_NAME}"
+        
+        
+    }
+  stages{
+     
+    stage('SCM Checkout'){
+	steps {
+       checkout([$class: 'GitSCM', branches: [[name: '*/master']], doGenerateSubmoduleConfigurations: false, extensions: [], submoduleCfg: [], userRemoteConfigs: [[credentialsId: 'GithubCredentails', url: 'https://github.com/mudaliar20/CanApplication.git']]])
+    }
+	}
+    
+    stage(" Maven Clean Package"){
+	steps{
+     // def mavenHome =  tool name: "maven3.6.3", type: "maven"
+     // def mavenCMD = "${mavenHome}/bin/mvn"
+      sh "mvn clean package -DskipTests"
+      sh 'npm install'
+      
+    } 
+	}
+    
+     stage('Black duck Scan'){
+	steps {
+       synopsys_detect detectProperties: '''
+       --detect.project.version.name=75
+       --detect.project.name="Canada-Application"
+       --detect.source.path=${WORKSPACE}
+       --detect.report.timeout=30000
+       ''', returnStatus: true
+    }
+	}
+    
+    stage('Build Docker Image'){
+	steps{
+        sh 'docker build -t 3.128.135.88:8083/petclinic:${BUILD_NUMBER} . >&1 | tee SomeFile.txt '
+    }
+	}
+    
+    stage('Push Docker Image'){
+	steps{
+	    sh '''
+	     PORT="$(grep "Step 5/5" ${WORKSPACE}/SomeFile.txt | sed 's/.* ://' |  sed -e 's/^[[:space:]]*//')"
+        echo "${PORT}"
+        docker login -u admin -p admin123 3.128.135.88:8083
+        docker push 3.128.135.88:8083/petclinic:${BUILD_NUMBER}
+        '''
+     }
+	 }
+     
+     	stage('twislock scan'){
+	    steps{
+	    sh '''
+	    /home/ubuntu/twistcli images scan --address https://us-west1.cloud.twistlock.com/us-3-159244848 -u 497d19ff-6c5c-431a-bf94-3e17f628938f -p 0pl+T/QwHVpMNy/CJVzkKR+cHSs= 3.128.135.88:8083/petclinic:${BUILD_NUMBER}
+	    '''
+	}
+	}
+	
+     stage('Test') {
+	 steps{
+	     sh ' rm -rf *.properties'
+	    // sh  "echo demo=${BUILD_NUMBER} >> ${env.JOB_NAME}-${env.BUILD_NUMBER}.properties"
+        // sh "echo  demo1=${env.WORKSPACE} >> ${env.JOB_NAME}-${env.BUILD_NUMBER}.properties"
+         sh "echo jobName=${env.JOB_NAME} >> variable.properties"
+sh "echo buildNumber=${env.BUILD_NUMBER} >> variable.properties"
+sh "echo BlackDuckProject=Canada-Application >> variable.properties"
+sh "echo BlackDuckVersion=${env.BUILD_NUMBER} >> variable.properties"
+sh "echo ImageID=sha256:a5b9a1a14a140cbecec3ebda3dc8d2cb8b02e65bf289bb9eb1595cedaeba4238 >> variable.properties"
+         sh 'npm publish'
+    }
+     }
+     
+     stage('Test variables') {
+	 steps{
+	     script{
+	 repoName = determineRepoName()
+	 }
+sh "echo repoName=${repoName} >> variable.properties"
+sh "echo branchName=master >> variable.properties"
+sh "echo commitId=0a317d78dd362a91404d69a2853473b92877ad28 >> variable.properties"
+
+    }
+     
+}
+}
+  
+    post {
+        always {
+            
+            archiveArtifacts artifacts: "variable.properties"
+        }
+    } 
+
+
+}
+String determineRepoName() {
+    return scm.getUserRemoteConfigs()[0].getUrl().tokenize('/')[3].split("\\.")[0]
+}

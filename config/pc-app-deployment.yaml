@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    deployedBy: spinnaker
+  labels:
+    app: pc-sample-app
+  name: pc-sample-app
+  namespace: pc-sample-dev
+spec:
+  replicas: 2
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: pc-sample-app
+  strategy:
+    rollingUpdate:
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: pc-sample-app
+        # spinnakerExecutionId gets a unique value on every spinnaker deploy which forces pod recreation. 
+        # This is necessary because we often re-build and re-create the same image name and if nothing in the 
+        # deployment spec changes, kubernetes will not recreate pods and image will not be updated
+        spinnakerExecutionId: ${ execution['id'] }
+    spec:
+      containers:
+        - image: >-
+            internal-KNexus-alb-690010959.us-east-1.elb.amazonaws.com:8888/petclinic:${ parameters.ImageVersion }
+          imagePullPolicy: Always
+          name: pc-sample-app
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          readinessProbe:
+            httpGet:
+              path: /services.properties
+              port: 8080
+            initialDelaySeconds: 20
+            periodSeconds: 10
+      dnsPolicy: ClusterFirst
+      imagePullSecrets:
+        - name: nexus
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30

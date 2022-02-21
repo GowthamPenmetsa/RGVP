@@ -1,0 +1,37 @@
+//noinspection GroovyAssignabilityCheck
+
+pipeline {
+    agent any
+    
+    stages {
+        stage('Deploying application into OpenShift'){
+        when {
+            expression { ! params.destroy }
+        }
+        steps{
+            script {
+            def buildNumber = Jenkins.instance.getItem('Powertrain').lastSuccessfulBuild.number
+            print buildNumber
+            sh '''#!/bin/bash -l
+            oc login --token=sha256~4MtE_ZkMA5QMV1HxFxOzsA_6_dpLd2c_2y2gM_HyNlk --server=https://api.openshift.68kv.p2.openshiftapps.com:6443
+            oc project powertrain-prod
+            OUT=$(oc get deployment|grep powertrain|awk '{print $1}')
+            echo $OUT
+
+            if [ "$OUT" == "powertrain" ]
+            then
+                    
+                    sed -i "s/@IMG_TAG@/'''+ buildNumber +'''/g" "${WORKSPACE}/os-deployment-prod.yaml"
+                    oc apply -f os-deployment-prod.yaml
+            else
+                    
+                    sed -i "s/@IMG_TAG@/'''+ buildNumber +'''/g" "${WORKSPACE}/os-deployment-prod.yaml"
+                    oc create -f os-deployment-prod.yaml
+            fi  
+        
+            '''
+        }
+        }
+        }
+    }
+}

@@ -1,0 +1,155 @@
+def loadValuesYaml(){
+  def valuesYaml = readYaml (file: './metadata.yaml')
+  return valuesYaml;
+}
+def repoName
+def repoURL
+def branchName
+pipeline {
+  agent any
+  tools {
+  nodejs "NODE"
+  maven "maven3.6.3"
+  }
+  environment {
+        buildnumber = "${BUILD_NUMBER}"
+        jobName    = "${env.JOB_NAME}"
+        
+        
+    }
+  stages{
+     
+    stage('SCM Checkout'){
+	steps {
+        script {
+      def scmVars = checkout([
+        $class: 'GitSCM'
+      ])
+      echo "env.GIT_COMMIT"
+      echo "${env.GIT_COMMIT}"
+    }
+       //checkout([$class: 'GitSCM', branches: [[name: '*/main']], doGenerateSubmoduleConfigurations: false, extensions: [], submoduleCfg: [], userRemoteConfigs: [[credentialsId: '5e42baea-ec87-4c12-ba81-2d5bab8d664f', url: 'https://github.com/mudaliar20/PowerTrain.git']]])
+        
+                
+    }
+	}
+    
+    stage(" Maven Clean Package"){
+	steps{
+     // def mavenHome =  tool name: "maven3.6.3", type: "maven"
+     // def mavenCMD = "${mavenHome}/bin/mvn"
+      sh "mvn clean package -DskipTests"
+      /*sh 'npm install'*/
+      
+    } 
+	}
+        
+         /*stage(" Sonar Scan"){
+	steps{
+             sh "mvn sonar:sonar"  
+    } 
+	}*/
+         
+
+    
+    stage('Build Docker Image'){
+	steps{
+	    sh "pwd"
+        sh 'docker build -t gcr.io/ford-project-319713/powertrain:${BUILD_NUMBER} . >&1 | tee SomeFile.txt '
+    }
+	}
+        
+    
+    stage('Push Docker Image to gcr.io'){
+	steps{
+	/*sh '''
+        docker login -u admin -p welcome@123 gcr.io/ford-project-319713/powertrain
+        '''*/
+        sh 'gcloud auth configure-docker'
+        sh 'docker push gcr.io/ford-project-319713/powertrain:${BUILD_NUMBER} >&1 | tee docker.txt'
+        
+     }
+	 }
+    
+    /*stage('Deploying application into OpenShift'){
+        when {
+            expression { ! params.destroy }
+        }
+        steps{
+            sh '''#!/bin/bash -l
+            oc login --token=sha256~X0crBsp3EJpvWhD52teKUEmbAt01jOy0IS-UcTw9VpY --server=https://api.openshift.68kv.p2.openshiftapps.com:6443
+            oc project powertrain
+            OUT=$(oc get deployment|grep powertrain|awk '{print $1}')
+            echo $OUT
+
+            if [ "$OUT" == "powertrain" ]
+            then
+                    sed -i "s/@IMG_TAG@/${BUILD_NUMBER}/g" "${WORKSPACE}/os-deployment.yaml"
+                    oc apply -f os-deployment.yaml
+            else
+                    sed -i "s/@IMG_TAG@/${BUILD_NUMBER}/g" "${WORKSPACE}/os-deployment.yaml"
+                    oc create -f os-deployment.yaml
+            fi  
+        
+            '''
+        }
+    }*/  
+  
+	
+       stage('Test') {
+	 steps{
+	 script{
+	 repoName = determineRepoName()
+         branchName = getGitBranchName() 
+         repoURL = determineRepoURL()
+         //valuesYaml = loadValuesYaml()
+	 }
+         sh ' rm -rf *.properties'
+       /*  sh '''
+        IMAGEID="$(grep "sha256:" demo.txt | cut -c 59-129 | awk '{$1=$1;print}')"
+         echo "TwislockImageID=${IMAGEID}" >> variable.properties
+         IMAGENAME="$(grep "Successfully tagged" SomeFile.txt | cut -d' ' -f 3)"
+         echo "TwislockImageName=http://${IMAGENAME}" >> variable.properties
+         '''*/	     
+         sh "echo jobName=${env.JOB_NAME} >> variable.properties"
+sh "echo buildNumber=${env.BUILD_NUMBER} >> variable.properties"
+sh "echo repoName=$repoName >> variable.properties"
+sh "echo branchName=$branchName >> variable.properties"
+sh "echo repoURL=$repoURL >> variable.properties"
+sh "echo commitId=${env.GIT_COMMIT} >> variable.properties"
+sh "echo apiVersion=${valuesYaml.apiVersion} >> variable.properties"
+sh "echo label=${valuesYaml.metadata.labels.name} >> variable.properties"
+/*sh "echo BlackDuckProject=Canada-Application >> variable.properties"
+sh "echo BlackDuckVersion=${env.BUILD_NUMBER} >> variable.properties"
+sh "echo ApplicationName=PetClinicDemoNexus >> variable.properties"
+sh "echo ApplicationProcess=DeployApplication >> variable.properties"*/
+
+
+
+    }
+     }
+     
+    
+}
+  
+    post {
+        always {
+            
+            archiveArtifacts artifacts: "variable.properties"
+        }
+    } 
+
+}
+
+
+
+String determineRepoName() {
+    return scm.getUserRemoteConfigs()[0].getUrl().tokenize('/')[3].split("\\.")[0]
+}
+String determineRepoURL() {
+    return scm.getUserRemoteConfigs()[0].getUrl()
+}
+String getGitBranchName() {
+    return scm.branches[0].name.tokenize("*")[0].split("\\/")[1]
+}
+

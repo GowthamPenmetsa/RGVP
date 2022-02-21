@@ -1,0 +1,24 @@
+steps:
+- name: gcr.io/cloud-builders/git
+  args: ['clone', 'https://github.com/balasath/petclinic-repo.git']
+- name: gcr.io/cloud-builders/mvn
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    ls \
+    && cd petclinic-repo \
+    && mvn clean package -DskipTests
+- name: gcr.io/cloud-builders/docker
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    cd petclinic-repo/target \
+    && xf=`ls *.jar` \
+    && xt=`echo $xf | awk '{print substr($1,1,match($1,/.[^.]*$/)-1)}' | awk '{print substr($1,match($1,/[0-9]/))}'` \
+    && cd .. \
+    && echo $xt \
+    && docker login https://registry.kaiburr.com -u kaiburr -p ******* \
+    && docker build . -t registry.kaiburr.com/petclinic:$xt \
+    && docker push registry.kaiburr.com/petclinic:$xt

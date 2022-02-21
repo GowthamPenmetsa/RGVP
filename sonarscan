@@ -1,0 +1,83 @@
+def repoName
+def repoURL
+def branchName
+pipeline {
+  agent any
+  tools {
+  maven "maven"
+  }
+  environment {
+        buildnumber = "${BUILD_NUMBER}"
+        jobName    = "${env.JOB_NAME}"
+        
+        
+    }
+  stages{
+     
+    stage('SCM Checkout'){
+	steps {
+        script {
+      def scmVars = checkout([
+        $class: 'GitSCM'
+      ])
+      echo "env.GIT_COMMIT"
+      echo "${env.GIT_COMMIT}"
+    }
+       checkout([$class: 'GitSCM', branches: [[name: '*/master']], doGenerateSubmoduleConfigurations: false, extensions: [], submoduleCfg: [], userRemoteConfigs: [[credentialsId: 'GithubCredentails', url: 'https://github.com/mudaliar20/maven-web-application.git']]])
+        
+                
+    }
+	}
+    
+    stage(" Maven Clean Package"){
+	steps{
+      sh "mvn sonar:sonar"
+      
+    } 
+	}
+        
+
+    
+     
+  
+	
+     stage('Test') {
+	 steps{
+	 script{
+	     repoName = determineRepoName()
+         branchName = getGitBranchName() 
+         repoURL = determineRepoURL()
+	 }
+         sh ' rm -rf *.properties'     
+         sh "echo jobName=${env.JOB_NAME} >> variable.properties"
+         sh "echo buildNumber=${env.BUILD_NUMBER} >> variable.properties"
+         sh "echo repoName=$repoName >> variable.properties"
+         sh "echo branchName=$branchName >> variable.properties"
+         sh "echo repoURL=$repoURL >> variable.properties"
+         sh "echo commitId=${env.GIT_COMMIT} >> variable.properties"
+    }
+     }
+     
+    
+}
+  
+    post {
+        always {
+            
+            archiveArtifacts artifacts: "variable.properties"
+        }
+    } 
+
+}
+
+
+
+String determineRepoName() {
+    return scm.getUserRemoteConfigs()[0].getUrl().tokenize('/')[3].split("\\.")[0]
+}
+String determineRepoURL() {
+    return scm.getUserRemoteConfigs()[0].getUrl()
+}
+String getGitBranchName() {
+    return scm.branches[0].name.tokenize("*")[0].split("\\/")[1]
+}
